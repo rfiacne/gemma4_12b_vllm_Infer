@@ -1,0 +1,15 @@
+# Virtual environments
+.venv_vllm/
+venv/
+.env/
+
+# Model files (large)
+models/
+
+# Runtime files
+vllm_server.log
+vllm_server.pid
+
+# Misc
+$PWD/
+.reasonix/

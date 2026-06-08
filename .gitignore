@@ -13,3 +13,6 @@ vllm_server.pid
 # Misc
 $PWD/
 .reasonix/
+# Local Pi runtime state
+.atl/
+.pi/

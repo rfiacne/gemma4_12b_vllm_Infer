@@ -65,11 +65,12 @@ docker run -d \
 	--privileged \
 	--ipc=host \
 	-p "${PORT}:8000" \
+	-e VLLM_MEMORY_PROFILER_ESTIMATE_CUDAGRAPHS=0 \
 	-v "${PWD}/${MODEL_DIR}:${MODEL_CONTAINER}:ro" \
 	-v "${HOME}/.cache/huggingface:/root/.cache/huggingface" \
 	-v "${PWD}/docker_entrypoint.sh:/docker_entrypoint.sh:ro" \
 	"${DOCKER_IMAGE}" \
-	-c "/docker_entrypoint.sh ${MODEL_CONTAINER} --tensor-parallel-size 1  --gpu-memory-utilization 0.95 --max-model-len 65536 --enable-auto-tool-choice --tool-call-parser gemma4 --chat-template examples/tool_chat_template_gemma4.jinja --reasoning-parser gemma4" \
+	-c "/docker_entrypoint.sh ${MODEL_CONTAINER} --tensor-parallel-size 1 --kv-cache-dtype fp8 --gpu-memory-utilization 0.90 --max-model-len 131072 --max-num-seqs 16 --enable-auto-tool-choice --tool-call-parser gemma4 --chat-template examples/tool_chat_template_gemma4.jinja --reasoning-parser gemma4" \
 	>"${LOG_FILE}" 2>&1
 
 echo "✅ 容器已启动。"

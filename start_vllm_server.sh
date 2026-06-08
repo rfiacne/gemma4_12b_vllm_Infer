@@ -5,12 +5,17 @@ set -e
 cd "$(dirname "$0")"
 
 # ── 配置 ──────────────────────────────────────────────
-MODEL_DIR="./models/gemma-4-12B-it-assistant"      # 本地模型目录（可仍在下载中）
-MODEL_CONTAINER="/models/gemma-4-12B-it-assistant" # 容器内绝对路径
-SERVED_NAME="gemma-4-12B-it-qat-w4a16"
+MODEL_DIR="./models/gemma-4-12B-it"             # Main model (12B)
+DRAFT_MODEL_DIR="./models/gemma-4-12B-it-assistant" # Draft model for speculation
+MODEL_CONTAINER="/models/gemma-4-12B-it"
+DRAFT_MODEL_CONTAINER="/models/gemma-4-12B-it-assistant"
+SERVED_NAME="/models/gemma-4-12B-it"
 PORT="${1:-1234}" # 默认 1234，可传参覆盖
 CONTAINER_NAME="vllm-gemma4-server"
 LOG_FILE="vllm_server.log"
+
+# Speculative decoding config (escaped quotes survive through two shell layers)
+SPECULATIVE_CONFIG='{\"model\":\"/models/gemma-4-12B-it-assistant\",\"num_speculative_tokens\":4}'
 
 DOCKER_IMAGE="docker.xuanyuan.run/vllm/vllm-openai:gemma4-unified-x86_64-cu130"
 
@@ -53,6 +58,7 @@ fi
 echo ""
 echo "=== 启动 vLLM Docker 容器 ==="
 echo "  Model dir:   ${MODEL_DIR} -> ${MODEL_CONTAINER} (容器内)"
+echo "  Draft model: ${DRAFT_MODEL_DIR} -> ${DRAFT_MODEL_CONTAINER} (容器内)"
 echo "  Served name: ${SERVED_NAME}"
 echo "  Port:        ${PORT} -> 8000 (容器内)"
 echo "  Log:         ${LOG_FILE}"
@@ -67,10 +73,11 @@ docker run -d \
 	-p "${PORT}:8000" \
 	-e VLLM_MEMORY_PROFILER_ESTIMATE_CUDAGRAPHS=0 \
 	-v "${PWD}/${MODEL_DIR}:${MODEL_CONTAINER}:ro" \
+	-v "${PWD}/${DRAFT_MODEL_DIR}:${DRAFT_MODEL_CONTAINER}:ro" \
 	-v "${HOME}/.cache/huggingface:/root/.cache/huggingface" \
 	-v "${PWD}/docker_entrypoint.sh:/docker_entrypoint.sh:ro" \
 	"${DOCKER_IMAGE}" \
-	-c "/docker_entrypoint.sh ${MODEL_CONTAINER} --tensor-parallel-size 1 --kv-cache-dtype fp8 --gpu-memory-utilization 0.90 --max-model-len 131072 --max-num-seqs 16 --enable-auto-tool-choice --tool-call-parser gemma4 --chat-template examples/tool_chat_template_gemma4.jinja --reasoning-parser gemma4" \
+	-c "/docker_entrypoint.sh ${MODEL_CONTAINER} --tensor-parallel-size 1 --kv-cache-dtype fp8 --gpu-memory-utilization 0.90 --max-model-len 131072 --max-num-seqs 16 --enable-auto-tool-choice --tool-call-parser gemma4 --chat-template examples/tool_chat_template_gemma4.jinja --reasoning-parser gemma4 --limit-mm-per-prompt.audio 0 --async-scheduling --speculative-config \"${SPECULATIVE_CONFIG}\"" \
 	>"${LOG_FILE}" 2>&1
 
 echo "✅ 容器已启动。"
